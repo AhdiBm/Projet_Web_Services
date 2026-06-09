@@ -1,11 +1,11 @@
 info:
   name: Modifier Message
   type: http
-  seq: 3
+  seq: 7
 
 http:
   method: PUT
-  url: http://localhost:8080/JournalAPI/api/messages/19
+  url: http://localhost:8080/JournalAPI/api/messages/18
   body:
     type: json
     data: |-

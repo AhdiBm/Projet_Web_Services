@@ -1,11 +1,11 @@
 info:
-  name: Supprimer Message
+  name: Créer canal
   type: http
-  seq: 8
+  seq: 5
 
 http:
-  method: DELETE
-  url: http://localhost:8080/JournalAPI/api/messages/18
+  method: POST
+  url: ""
   auth: inherit
 
 settings:
