@@ -1,0 +1,15 @@
+info:
+  name: Supprimer Message
+  type: http
+  seq: 4
+
+http:
+  method: DELETE
+  url: http://localhost:8080/JournalAPI/api/messages/18
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

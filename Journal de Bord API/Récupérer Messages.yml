@@ -1,0 +1,19 @@
+info:
+  name: Récupérer Messages
+  type: http
+  seq: 1
+
+http:
+  method: GET
+  url: http://localhost:8080/JournalAPI/api/messages?channelId=1
+  params:
+    - name: channelId
+      value: "1"
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

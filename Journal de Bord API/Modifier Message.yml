@@ -1,0 +1,21 @@
+info:
+  name: Modifier Message
+  type: http
+  seq: 3
+
+http:
+  method: PUT
+  url: http://localhost:8080/JournalAPI/api/messages/19
+  body:
+    type: json
+    data: |-
+      {
+        "content": "Contenu mis à jour proprement avec Bruno."
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

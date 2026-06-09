@@ -1,0 +1,15 @@
+info:
+  name: Se Deconnecter
+  type: http
+  seq: 7
+
+http:
+  method: POST
+  url: http://localhost:8080/JournalAPI/api/logout
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
