@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Journal de Bord - Messagerie</title>
+    <style>
+        :root {
+            --bg-primary: #1e1e2e;
+            --bg-secondary: #252538;
+            --bg-chat: #181825;
+            --text-main: #cdd6f4;
+            --text-muted: #a6adc8;
+            --accent: #89b4fa;
+            --error: #f38ba8;
+            --success: #a6e3a1;
+            --border: #313244;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Barre supérieure (Authentification) */
+        header {
+            background-color: var(--bg-secondary);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .auth-container input {
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        button {
+            background-color: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 6px 15px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.9; }
+        button.btn-logout { background-color: var(--error); color: white; }
+
+        /* Corps principal */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Sidebar - Liste des canaux */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 15px 0;
+        }
+
+        .sidebar h3 { padding: 0 15px 10px 15px; border-bottom: 1px solid var(--border); margin-bottom: 10px; }
+        
+        .channel-list { list-style: none; overflow-y: auto; }
+        
+        .channel-item {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background 0.2s;
+        }
+
+        .channel-item:hover, .channel-item.active { background-color: var(--bg-primary); color: var(--accent); }
+        .channel-type { font-size: 0.8rem; padding: 2px 6px; border-radius: 3px; background: var(--border); color: var(--text-muted); }
+
+        /* Zone de discussion principale */
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--bg-chat);
+        }
+
+        .chat-header {
+            padding: 15px 20px;
+            background-color: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            font-weight: bold;
+        }
+
+        .messages-container {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        /* Style des messages */
+        .message-card {
+            background: var(--bg-secondary);
+            padding: 12px;
+            border-radius: 8px;
+            max-width: 80%;
+            align-self: flex-start;
+            border: 1px solid var(--border);
+        }
+
+        .message-card.meta-me {
+            align-self: flex-end;
+            border-color: var(--accent);
+            background: #2a354d;
+        }
+
+        .msg-meta { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 5px; display: flex; gap: 10px; }
+        .msg-author { font-weight: bold; color: var(--accent); }
+        .msg-content { word-break: break-word; line-height: 1.4; }
+
+        /* Formulaire d'envoi */
+        .input-area {
+            padding: 20px;
+            background-color: var(--bg-secondary);
+            border-top: 1px solid var(--border);
+        }
+
+        .input-form { display: flex; gap: 10px; }
+        
+        .input-form textarea {
+            flex: 1;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 6px;
+            resize: none;
+            height: 45px;
+        }
+
+        .input-form textarea:focus { outline: 1px solid var(--accent); }
+
+        /* Notification */
+        .system-notification { color: var(--error); font-size: 0.9rem; text-align: center; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2>💬 Polytech Chat</h2>
+        <div id="authSection" class="auth-container">
+            </div>
+    </header>
+
+    <div class="main-container">
+        <aside class="sidebar">
+            <h3>Salons</h3>
+            <ul id="channelList" class="channel-list"></ul>
+        </aside>
+
+        <main class="chat-area">
+            <div id="activeChannelName" class="chat-header">Sélectionnez un salon pour commencer à discuter</div>
+            <div id="messagesContainer" class="messages-container"></div>
+            
+            <div class="input-area">
+                <form id="messageForm" class="input-form">
+                    <textarea id="messageInput" placeholder="Écrire un message..." disabled></textarea>
+                    <button type="submit" id="sendBtn" disabled>Envoyer</button>
+                </form>
+                <div id="notificationArea" class="system-notification"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- ÉTAT GLOBAL DE L'APPLICATION ---
+        let currentUser = JSON.parse(sessionStorage.getItem('chatUser')) || null;
+        let currentChannelId = null;
+        let refreshInterval = null;
+        
+
+        // Base URL de l'API REST
+        const API_BASE = '/JournalAPI/api';
+
+        // Éléments DOM
+        const authSection = document.getElementById('authSection');
+        const channelList = document.getElementById('channelList');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const activeChannelName = document.getElementById('activeChannelName');
+        const messageForm = document.getElementById('messageForm');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const notificationArea = document.getElementById('notificationArea');
+
+        // --- INTERFACE D'AUTHENTIFICATION ---
+        function renderAuth() {
+            if (currentUser) {
+                authSection.innerHTML = `
+                    <span>Connecté : <strong>${currentUser.login}</strong> (${currentUser.role})</span>
+                    <button class="btn-logout" onclick="handleLogout()">Déconnexion</button>
+                `;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+            } else {
+                authSection.innerHTML = `
+                    <input type="text" id="loginInput" placeholder="Identifiant">
+                    <input type="password" id="pwdInput" placeholder="Mot de passe">
+                    <button onclick="handleLogin()">Connexion</button>
+                `;
+                // 1. Désactiver les boutons d'envoi
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                messageInput.value = '';
+
+                // 2. NETTOYAGE CRUCIAL : On vide l'écran pour les déconnectés
+                currentChannelId = null; 
+                activeChannelName.textContent = 'Sélectionnez un salon pour commencer à discuter';
+                messagesContainer.innerHTML = ''; // Efface les messages secrets du centre
+                channelList.innerHTML = '';       // Efface la liste des salons à gauche
+
+                // 3. Arrêter le rafraîchissement automatique d'arrière-plan
+                clearInterval(refreshInterval);
+            }
+            // AJOUT : On recharge les salons pour actualiser l'affichage public/privé
+            loadChannels(); 
+        }
+
+        async function handleLogin() {
+            const login = document.getElementById('loginInput').value;
+            const pwd = document.getElementById('pwdInput').value;
+
+            try {
+                const response = await fetch(`${API_BASE}/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ login, pwd })
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    currentUser = data.user;
+                    // AJOUT : On sauvegarde l'utilisateur dans la mémoire du navigateur
+                    sessionStorage.setItem('chatUser', JSON.stringify(currentUser));
+                    
+                    notificationArea.textContent = "";
+                    renderAuth();
+                    loadChannels();
+                } else {
+                    notificationArea.textContent = data.message || "Erreur d'authentification";
+                }
+            } catch (err) {
+                notificationArea.textContent = "Erreur de connexion au serveur.";
+            }
+        }
+
+        async function handleLogout() {
+            try {
+                await fetch(`${API_BASE}/logout`, { method: 'POST' });
+                currentUser = null;
+                // AJOUT : On vide la mémoire du navigateur
+                sessionStorage.removeItem('chatUser');
+                renderAuth();
+            } catch (err) {
+                console.error("Erreur de déconnexion", err);
+            }
+        }
+
+        // --- GESTION DES CANAUX ---
+        async function loadChannels() {
+            try {
+                const response = await fetch(`${API_BASE}/channels`, { 
+                    method: 'GET',
+                    cache: 'no-store' // Interdit formellement la mise en cache
+                });
+                if (response.ok) {
+                    const channels = await response.json();
+                    channelList.innerHTML = channels.map(ch => `
+                        <li class="channel-item" id="ch-${ch.id}" onclick="selectChannel(${ch.id}, '${ch.name}')">
+                            <span># ${ch.name}</span>
+                            <span class="channel-type">${ch.type}</span>
+                        </li>
+                    `).join('');
+                } else {
+                    channelList.innerHTML = `<li style="padding: 15px; color: var(--text-muted)">Connectez-vous pour voir les salons</li>`;
+                }
+            } catch (err) {
+                console.error("Impossible de charger les canaux", err);
+            }
+        }
+
+        function selectChannel(id, name) {
+            currentChannelId = id;
+            activeChannelName.textContent = `# ${name}`;
+            
+            // Gestion visuelle de la sélection active
+            document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
+            document.getElementById(`ch-${id}`).classList.add('active');
+
+            loadMessages();
+
+            // Phase 5 - Mise à jour périodique : Rafraîchissement automatique toutes les 3 secondes
+            clearInterval(refreshInterval);
+            refreshInterval = setInterval(loadMessages, 3000);
+        }
+
+        // --- GESTION DES MESSAGES ---
+        async function loadMessages() {
+            if (!currentChannelId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/messages?channelId=${currentChannelId}`, {
+                    method: 'GET',
+                    cache: 'no-store' // Interdit formellement la mise en cache
+                });
+                if (response.ok) {
+                    const messages = await response.json();
+                    
+                    messagesContainer.innerHTML = messages.map(msg => {
+                        const isMe = currentUser && msg.userId === currentUser.id;
+                        const isAdmin = currentUser && currentUser.role === 'admin'; 
+                        
+                        return `
+                            <div class="message-card ${isMe ? 'meta-me' : ''}">
+                                <div class="msg-meta">
+                                    <span class="msg-author">Utilisateur #${msg.userId}</span>
+                                    <span>${new Date(msg.createdAt).toLocaleTimeString()}</span>
+                                    
+                                    ${(isMe || isAdmin) ? `
+                                        <span style="margin-left: auto; display: flex; gap: 8px;">
+                                            <a href="#" onclick="editMessage(${msg.id}, '${msg.content.replace(/'/g, "\\'")}')" style="color: var(--accent); text-decoration: none; font-size: 0.8rem;">✏️</a>
+                                            <a href="#" onclick="deleteMessage(${msg.id})" style="color: var(--error); text-decoration: none; font-size: 0.8rem;">🗑️</a>
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                <div class="msg-content" id="msg-text-${msg.id}">${msg.content}</div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    // Scroll automatique vers le bas lors de la réception de messages
+                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                    notificationArea.textContent = "";
+                } else if (response.status === 401) {
+                    // Si Tomcat dit que la session est morte, on force la déconnexion locale
+                    sessionStorage.removeItem('chatUser');
+                    currentUser = null;
+                    renderAuth();
+                    notificationArea.textContent = "Votre session a expiré, veuillez vous reconnecter.";
+                } else if (response.status === 403) {
+                    messagesContainer.innerHTML = `<div style="text-align:center; color:var(--error); margin-top:20px;">🔒 Accès interdit à ce canal privé.</div>`;
+                    clearInterval(refreshInterval);
+                }                 else {
+                    const data = await response.json();
+                    notificationArea.textContent = data.message || "Erreur de chargement des messages.";
+                }
+            } catch (err) {
+                console.error("Erreur lors de la récupération des messages", err);
+            }
+        }
+
+        // Envoi d'un message (POST)
+        messageForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const content = messageInput.value.trim();
+            if (!content || !currentChannelId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/messages`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        channelId: currentChannelId,
+                        content: content
+                    })
+                });
+
+                if (response.ok) {
+                    messageInput.value = '';
+                    loadMessages(); // Rechargement immédiat après envoi
+                } else {
+                    const data = await response.json();
+                    notificationArea.textContent = data.message || "Erreur d'envoi.";
+                }
+            } catch (err) {
+                notificationArea.textContent = "Erreur de transmission.";
+            }
+        });
+
+        // Fonction pour modifier un message (PUT)
+        async function editMessage(id, oldContent) {
+            const newContent = prompt("Modifier votre message :", oldContent);
+            if (!newContent || newContent.trim() === "" || newContent === oldContent) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/messages/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: newContent })
+                });
+
+                if (response.ok) {
+                    loadMessages(); // Rafraîchir l'écran
+                } else {
+                    // On récupère le JSON d'erreur précis renvoyé par la servlet doPut
+                    const data = await response.json().catch(() => ({ message: "Erreur serveur inconnue" }));
+                    alert(`Erreur lors de la modification (${response.status}) : ${data.message}`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur de communication avec le serveur.");
+            }
+        }
+
+        // Fonction pour supprimer un message (DELETE)
+        async function deleteMessage(id) {
+            if (!confirm("Voulez-vous vraiment supprimer ce message ?")) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/messages/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadMessages(); // Rafraîchir l'écran
+                } else {
+                    const data = await response.json().catch(() => ({ message: "Erreur serveur inconnue" }));
+                    alert(`Erreur lors de la suppression (${response.status}) : ${data.message}`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur de communication avec le serveur.");
+            }
+        }
+
+        // Initialisation au chargement de la page
+        renderAuth();
+        loadChannels();
+    </script>
+</body>
+</html>
