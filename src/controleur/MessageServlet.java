@@ -177,7 +177,7 @@ public class MessageServlet extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         PrintWriter out = response.getWriter();
 
-        // Extraction de l'ID du message depuis le chemin de l'URL (ex: /5)
+        // Extraction de l'ID du message depuis le chemin de l'URL
         String pathInfo = request.getPathInfo();
         if (pathInfo == null || pathInfo.equals("/")) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -217,9 +217,9 @@ public class MessageServlet extends HttpServlet {
             User currentUser = (User) session.getAttribute("currentUser");
 
             // Sécurité : Seul l'auteur peut modifier/supprimer son message
-            if (existingMessage.getUserId() != currentUser.getId()) {
+            if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())){
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
-                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas l'auteur de ce message.\"}");
+                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas l'auteur de ce message et vous n'êtes pas administrateur.\"}");
                 return;
             }
 
@@ -281,7 +281,7 @@ public class MessageServlet extends HttpServlet {
             User currentUser = (User) session.getAttribute("currentUser");
 
             // Sécurité : Seul l'auteur peut modifier/supprimer son message
-            if (existingMessage.getUserId() != currentUser.getId()) {
+            if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
                 out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas l'auteur de ce message.\"}");
                 return;
