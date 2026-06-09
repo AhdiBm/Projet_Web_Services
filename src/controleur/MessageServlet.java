@@ -217,9 +217,9 @@ public class MessageServlet extends HttpServlet {
             User currentUser = (User) session.getAttribute("currentUser");
 
             // Sécurité : Seul l'auteur peut modifier/supprimer son message
-            if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())){
+            if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
-                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas l'auteur de ce message et vous n'êtes pas administrateur.\"}");
+                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous devez être l'auteur du message ou administrateur pour effectuer cette action.\"}");
                 return;
             }
 
@@ -283,7 +283,7 @@ public class MessageServlet extends HttpServlet {
             // Sécurité : Seul l'auteur peut modifier/supprimer son message
             if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
-                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas l'auteur de ce message.\"}");
+                out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous devez être l'auteur du message ou administrateur pour effectuer cette action.\"}");
                 return;
             }
 
