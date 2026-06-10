@@ -1,7 +1,7 @@
 info:
   name: Récupérer Messages
   type: http
-  seq: 3
+  seq: 4
 
 http:
   method: GET
@@ -10,7 +10,10 @@ http:
     - name: channelId
       value: "1"
       type: query
-  auth: inherit
+  auth:
+    type: basic
+    username: jean
+    password: jean123
 
 settings:
   encodeUrl: true

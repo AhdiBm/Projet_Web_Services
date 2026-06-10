@@ -1,12 +1,22 @@
 info:
-  name: Créer canal
+  name: Créer Canal
   type: http
-  seq: 5
+  seq: 3
 
 http:
   method: POST
-  url: ""
-  auth: inherit
+  url: http://localhost:8080/JournalAPI/api/channels
+  body:
+    type: json
+    data: |-
+      {
+        "name": "Canal Jean",
+        "type": "private"
+      }
+  auth:
+    type: basic
+    username: jean
+    password: jean123
 
 settings:
   encodeUrl: true

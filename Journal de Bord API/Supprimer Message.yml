@@ -1,12 +1,15 @@
 info:
   name: Supprimer Message
   type: http
-  seq: 8
+  seq: 7
 
 http:
   method: DELETE
-  url: http://localhost:8080/JournalAPI/api/messages/18
-  auth: inherit
+  url: http://localhost:8080/JournalAPI/api/messages/15
+  auth:
+    type: basic
+    username: jean
+    password: jean123
 
 settings:
   encodeUrl: true

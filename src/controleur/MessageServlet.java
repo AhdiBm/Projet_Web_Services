@@ -10,14 +10,13 @@ import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.http.HttpSession;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.List;
 
-@WebServlet("/api/messages/*") // Note le /* pour pouvoir intercepter les IDs dans l'URL du type /api/messages/5
+@WebServlet("/api/messages/*")
 public class MessageServlet extends HttpServlet {
 
     private MessageDAO messageDAO;
@@ -25,11 +24,12 @@ public class MessageServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
+        // Initialisation du DAO message et de Jackson pour JSON
         this.messageDAO = new MessageDAOJDBC();
         this.objectMapper = new ObjectMapper();
     }
 
-
+    // Récupère la liste des messages d'un canal, en vérifiant les droits d'accès pour les canaux privés.
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
@@ -38,17 +38,17 @@ public class MessageServlet extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         PrintWriter out = response.getWriter();
 
-        // 1. Vérification de l'authentification
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("currentUser") == null) {
+        // Vérifier que l'utilisateur est connecté
+        User currentUser = getAuthenticatedUser(request);
+        if (currentUser == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Accès refusé : vous devez être connecté.\"}");
+            out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Accès refusé : Authentification Basic REST requise.\"}");
             return;
         }
         
-        User currentUser = (User) session.getAttribute("currentUser");
         String channelIdParam = request.getParameter("channelId");
 
+        // Vérifier que le canal est précisé
         if (channelIdParam == null || channelIdParam.isEmpty()) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             out.print("{\"status\":\"error\",\"code\":400,\"message\":\"Le paramètre 'channelId' est obligatoire.\"}");
@@ -58,7 +58,6 @@ public class MessageServlet extends HttpServlet {
         try {
             int channelId = Integer.parseInt(channelIdParam);
             
-            // Instanciation du ChannelDAO pour vérifier les propriétés du canal
             dao.ChannelDAO channelDAO = new dao.ChannelDAOJDBC();
             dto.Channel channel = channelDAO.findById(channelId);
             
@@ -68,18 +67,16 @@ public class MessageServlet extends HttpServlet {
                 return;
             }
 
-            // Si le canal est privé, on vérifie si l'utilisateur est membre
             if ("private".equalsIgnoreCase(channel.getType())) {
                 boolean isAuthorized = channelDAO.isUserMember(channelId, currentUser.getId());
                 
                 if (!isAuthorized) {
-                    response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403 Forbidden
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                     out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous n'êtes pas membre de ce canal privé.\"}");
                     return;
                 }
             }
 
-            // Si public OU si l'utilisateur est membre du canal privé -> On charge les messages
             List<Message> messages = messageDAO.findByChannelId(channelId);
             out.print(objectMapper.writeValueAsString(messages));
             response.setStatus(HttpServletResponse.SC_OK);
@@ -94,7 +91,7 @@ public class MessageServlet extends HttpServlet {
         out.flush();
     }
 
-
+    // Permet à un utilisateur connecté de publier un message dans un canal, en vérifiant les droits d'accès pour les canaux privés.
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
@@ -103,16 +100,13 @@ public class MessageServlet extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         PrintWriter out = response.getWriter();
 
-        // 1. Récupération de la session existante (sans la créer si elle n'existe pas)
-        HttpSession session = request.getSession(false);
-        if (session == null || session.getAttribute("currentUser") == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED); // 401
+        // Vérifier que l'utilisateur est connecté avant de publier un message
+        User currentUser = getAuthenticatedUser(request);
+        if (currentUser == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Accès refusé : vous devez être connecté pour publier un message.\"}");
             return;
         }
-
-        // On récupère l'utilisateur actuellement authentifié
-        User currentUser = (User) session.getAttribute("currentUser");
 
         try {
             StringBuilder sb = new StringBuilder();
@@ -126,7 +120,6 @@ public class MessageServlet extends HttpServlet {
             Message newMessage = objectMapper.readValue(sb.toString(), Message.class);
             
             
-            // Avant d'insérer, on vérifie les droits sur le canal ciblé
             dao.ChannelDAO channelDAO = new dao.ChannelDAOJDBC();
             dto.Channel channel = channelDAO.findById(newMessage.getChannelId());
             
@@ -144,10 +137,8 @@ public class MessageServlet extends HttpServlet {
                 }
             }
 
-            // EXTRACTION SÉCURISÉE : On force l'ID de l'auteur avec celui de la session !
             newMessage.setUserId(currentUser.getId()); 
 
-            // Validation (on n'a plus besoin de vérifier le userId dans le JSON)
             if (newMessage.getContent() == null || newMessage.getContent().trim().isEmpty() || newMessage.getChannelId() <= 0) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.print("{\"status\":\"error\",\"code\":400,\"message\":\"Champs requis manquants ou invalides (content, channelId).\"}");
@@ -168,7 +159,7 @@ public class MessageServlet extends HttpServlet {
         out.flush();
     }
 
-
+    // Permet à un utilisateur de modifier le contenu d'un message qu'il a publié, ou à un administrateur de modifier n'importe quel message.
     @Override
     protected void doPut(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
@@ -188,7 +179,6 @@ public class MessageServlet extends HttpServlet {
         try {
             int messageId = Integer.parseInt(pathInfo.substring(1));
             
-            // Lecture du nouveau contenu JSON envoyé dans le corps
             StringBuilder sb = new StringBuilder();
             String line;
             try (BufferedReader reader = request.getReader()) {
@@ -199,35 +189,30 @@ public class MessageServlet extends HttpServlet {
 
             Message partialMessage = objectMapper.readValue(sb.toString(), Message.class);
             
-            // Récupération du message original en BDD
             Message existingMessage = messageDAO.findById(messageId);
             if (existingMessage == null) {
-                response.setStatus(HttpServletResponse.SC_NOT_FOUND); // 404
+                response.setStatus(HttpServletResponse.SC_NOT_FOUND);
                 out.print("{\"status\":\"error\",\"code\":404,\"message\":\"Le message avec l'ID " + messageId + " n'existe pas.\"}");
                 return;
             }
             
-            // Vérification de l'authentification en session
-            HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute("currentUser") == null) {
+            User currentUser = getAuthenticatedUser(request);
+            if (currentUser == null) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Authentification requise.\"}");
                 return;
             }
-            User currentUser = (User) session.getAttribute("currentUser");
 
-            // Sécurité : Seul l'auteur peut modifier/supprimer son message
             if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
+                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous devez être l'auteur du message ou administrateur pour effectuer cette action.\"}");
                 return;
             }
 
-            // Mise à jour du contenu textuel
             existingMessage.setContent(partialMessage.getContent());
 
             if (messageDAO.update(existingMessage)) {
-                response.setStatus(HttpServletResponse.SC_OK); // 200 OK
+                response.setStatus(HttpServletResponse.SC_OK);
                 out.print(objectMapper.writeValueAsString(existingMessage));
             } else {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
@@ -244,7 +229,7 @@ public class MessageServlet extends HttpServlet {
         out.flush();
     }
 
-
+    // Permet à un utilisateur de supprimer un message qu'il a publié, ou à un administrateur de supprimer n'importe quel message.
     @Override
     protected void doDelete(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
@@ -253,6 +238,7 @@ public class MessageServlet extends HttpServlet {
         response.setCharacterEncoding("UTF-8");
         PrintWriter out = response.getWriter();
 
+        // Extraction de l'ID du message à supprimer depuis l'URL
         String pathInfo = request.getPathInfo();
         if (pathInfo == null || pathInfo.equals("/")) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -263,7 +249,6 @@ public class MessageServlet extends HttpServlet {
         try {
             int messageId = Integer.parseInt(pathInfo.substring(1));
             
-            // Vérification de l'existence du message
             Message existingMessage = messageDAO.findById(messageId);
             if (existingMessage == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -271,25 +256,21 @@ public class MessageServlet extends HttpServlet {
                 return;
             }
 
-            // Vérification de l'authentification en session
-            HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute("currentUser") == null) {
+            User currentUser = getAuthenticatedUser(request);
+            if (currentUser == null) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Authentification requise.\"}");
                 return;
             }
-            User currentUser = (User) session.getAttribute("currentUser");
 
-            // Sécurité : Seul l'auteur peut modifier/supprimer son message
             if (existingMessage.getUserId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
                 response.setStatus(HttpServletResponse.SC_FORBIDDEN); // 403
                 out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès interdit : vous devez être l'auteur du message ou administrateur pour effectuer cette action.\"}");
                 return;
             }
 
-            // Exécution de la suppression
             if (messageDAO.delete(messageId)) {
-                response.setStatus(HttpServletResponse.SC_NO_CONTENT); // 204 No Content (Succès sans corps de réponse)
+                response.setStatus(HttpServletResponse.SC_NO_CONTENT);
             } else {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 out.print("{\"status\":\"error\",\"code\":500,\"message\":\"Impossible de supprimer le message.\"}");
@@ -303,5 +284,34 @@ public class MessageServlet extends HttpServlet {
             out.print("{\"status\":\"error\",\"code\":500,\"message\":\"Erreur système lors du traitement.\"}");
         }
         out.flush();
+    }
+
+    // Méthode utilitaire pour extraire l'utilisateur authentifié à partir de l'en-tête HTTP Authorization
+    private User getAuthenticatedUser(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Basic ")) {
+            return null;
+        }
+        
+        try {
+            String token = authHeader.substring("Basic ".length()).trim();
+            
+            byte[] decodedBytes = java.util.Base64.getDecoder().decode(token);
+            String credentials = new String(decodedBytes);
+            
+            String[] lm = credentials.split(":", 2);
+            if (lm.length != 2) return null;
+            
+            String login = lm[0].trim();
+            String pwd = lm[1].trim();
+            
+            dao.UserDAO userDAO = new dao.UserDAOJDBC();
+            if (userDAO.checkCredentials(login, pwd)) {
+                return userDAO.findByLogin(login);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }

@@ -22,6 +22,7 @@ public class MessageDAOJDBC implements MessageDAO {
         return DriverManager.getConnection(url, dbUser, dbPassword);
     }
 
+    // Récupère un message par son ID, utilisé pour vérifier les droits d'auteur.
     @Override
     public Message findById(int messageId) {
         String sql = "SELECT * FROM message WHERE id = ?";
@@ -45,6 +46,7 @@ public class MessageDAOJDBC implements MessageDAO {
         return null;
     }
 
+    // Récupère la liste des messages d'un canal, triés par date de création.
     @Override
     public List<Message> findByChannelId(int channelId) {
         List<Message> messages = new ArrayList<>();
@@ -69,6 +71,7 @@ public class MessageDAOJDBC implements MessageDAO {
         return messages;
     }
 
+    // Crée un message dans un canal, en associant le contenu, l'auteur et le canal.
     @Override
     public boolean create(Message message) {
         String sql = "INSERT INTO message (content, user_id, channel_id) VALUES (?, ?, ?)";
@@ -93,6 +96,7 @@ public class MessageDAOJDBC implements MessageDAO {
         return false;
     }
 
+    // Met à jour le contenu d'un message existant, identifié par son ID.
     @Override
     public boolean update(Message message) {
         String sql = "UPDATE message SET content = ? WHERE id = ?";
@@ -107,6 +111,7 @@ public class MessageDAOJDBC implements MessageDAO {
         return false;
     }
 
+    // Supprime un message identifié par son ID.
     @Override
     public boolean delete(int messageId) {
         String sql = "DELETE FROM message WHERE id = ?";

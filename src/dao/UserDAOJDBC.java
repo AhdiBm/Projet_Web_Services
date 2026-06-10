@@ -22,6 +22,7 @@ public class UserDAOJDBC implements UserDAO {
         return DriverManager.getConnection(url, dbUser, dbPassword);
     }
 
+    // Récupère un utilisateur par son ID
     @Override
     public User findById(int id) {
         String sql = "SELECT * FROM users WHERE id = ?";
@@ -39,6 +40,7 @@ public class UserDAOJDBC implements UserDAO {
         return null;
     }
 
+    // Récupère un utilisateur par son login
     @Override
     public User findByLogin(String login) {
         String sql = "SELECT * FROM users WHERE login = ?";
@@ -56,6 +58,7 @@ public class UserDAOJDBC implements UserDAO {
         return null;
     }
 
+    // Récupère tous les utilisateurs
     @Override
     public List<User> findAll() {
         List<User> users = new ArrayList<>();
@@ -72,6 +75,7 @@ public class UserDAOJDBC implements UserDAO {
         return users;
     }
 
+    // Vérifie que les identifiants fournis correspondent à un utilisateur.
     @Override
     public boolean checkCredentials(String login, String password) {
         String sql = "SELECT * FROM users WHERE login = ? AND pwd = ?";

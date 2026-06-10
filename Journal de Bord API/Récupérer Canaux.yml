@@ -1,12 +1,15 @@
 info:
-  name: Récupérer Canal
+  name: Récupérer Canaux
   type: http
-  seq: 4
+  seq: 2
 
 http:
   method: GET
   url: http://localhost:8080/JournalAPI/api/channels
-  auth: inherit
+  auth:
+    type: basic
+    username: paul
+    password: paul456
 
 settings:
   encodeUrl: true

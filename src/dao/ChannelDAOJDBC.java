@@ -18,10 +18,12 @@ public class ChannelDAOJDBC implements ChannelDAO {
         }
     }
 
+    // Méthode utilitaire pour obtenir une connexion à la base de données
     private Connection getConnection() throws SQLException {
         return DriverManager.getConnection(url, dbUser, dbPassword);
     }
 
+    // Récupère un canal par son ID
     @Override
     public Channel findById(int channelId) {
         String sql = "SELECT * FROM channel WHERE id = ?";
@@ -44,6 +46,7 @@ public class ChannelDAOJDBC implements ChannelDAO {
         return null;
     }
 
+    // Récupère tous les canaux
     @Override
     public List<Channel> findAll() {
         List<Channel> channels = new ArrayList<>();
@@ -65,6 +68,7 @@ public class ChannelDAOJDBC implements ChannelDAO {
         return channels;
     }
 
+    // Récupère uniquement les canaux publics
     @Override
     public List<Channel> findPublicChannels() {
         List<Channel> channels = new ArrayList<>();
@@ -86,6 +90,7 @@ public class ChannelDAOJDBC implements ChannelDAO {
         return channels;
     }
 
+    // Récupère les canaux auxquels un utilisateur peut accéder
     @Override
     public List<Channel> findAvailableChannels(int userId) {
         List<Channel> channels = new ArrayList<>();
@@ -115,6 +120,7 @@ public class ChannelDAOJDBC implements ChannelDAO {
         return channels;
     }
 
+    // Vérifie si un utilisateur est membre d'un canal spécifique
     @Override
     public boolean isUserMember(int channelId, int userId) {
         String sql = "SELECT COUNT(*) FROM channel_member WHERE channel_id = ? AND user_id = ?";
@@ -133,6 +139,7 @@ public class ChannelDAOJDBC implements ChannelDAO {
         return false;
     }
 
+    // Ajoute un membre à un canal
     @Override
     public boolean addMember(int channelId, int userId, boolean isRoomAdmin) {
         String sql = "INSERT INTO channel_member (channel_id, user_id, is_room_admin) VALUES (?, ?, ?)";
@@ -142,6 +149,62 @@ public class ChannelDAOJDBC implements ChannelDAO {
             pstmt.setInt(2, userId);
             pstmt.setBoolean(3, isRoomAdmin);
             return pstmt.executeUpdate() > 0;
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    // Crée un canal et ajoute son créateur comme membre administrateur.
+    @Override
+    public boolean create(Channel channel) {
+        String sqlChannel = "INSERT INTO channel (name, type, creator_id) VALUES (?, ?, ?)";
+        
+        try (Connection conn = getConnection()) {
+            conn.setAutoCommit(false); 
+            
+            try (PreparedStatement pstmtChannel = conn.prepareStatement(sqlChannel, Statement.RETURN_GENERATED_KEYS)) {
+                pstmtChannel.setString(1, channel.getName());
+                pstmtChannel.setString(2, channel.getType());
+                if (channel.getCreatorId() > 0) {
+                    pstmtChannel.setInt(3, channel.getCreatorId());
+                } else {
+                    pstmtChannel.setNull(3, Types.INTEGER);
+                }
+                
+                int affectedRows = pstmtChannel.executeUpdate();
+                if (affectedRows == 0) {
+                    conn.rollback();
+                    return false;
+                }
+                
+                try (ResultSet generatedKeys = pstmtChannel.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int generatedId = generatedKeys.getInt(1);
+                        channel.setId(generatedId); // On met à jour l'objet avec l'ID réel
+                    } else {
+                        conn.rollback();
+                        return false;
+                    }
+                }
+                
+                String sqlMember = "INSERT INTO channel_member (channel_id, user_id, is_room_admin) VALUES (?, ?, ?)";
+                try (PreparedStatement pstmtMember = conn.prepareStatement(sqlMember)) {
+                    pstmtMember.setInt(1, channel.getId());
+                    pstmtMember.setInt(2, channel.getCreatorId());
+                    pstmtMember.setBoolean(3, true); // Le créateur est admin de sa room
+                    pstmtMember.executeUpdate();
+                }
+                
+                conn.commit();
+                return true;
+                
+            } catch (SQLException e) {
+                conn.rollback();
+                e.printStackTrace();
+            } finally {
+                conn.setAutoCommit(true);
+            }
         } catch (SQLException e) {
             e.printStackTrace();
         }

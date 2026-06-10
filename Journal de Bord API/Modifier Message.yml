@@ -1,18 +1,21 @@
 info:
   name: Modifier Message
   type: http
-  seq: 7
+  seq: 6
 
 http:
   method: PUT
-  url: http://localhost:8080/JournalAPI/api/messages/18
+  url: http://localhost:8080/JournalAPI/api/messages/13
   body:
     type: json
     data: |-
       {
-        "content": "Contenu mis à jour proprement avec Bruno."
+        "content": "Ceci est un test depuis Bruno ! et l'admin a fait ça ! et moi j'ai ajouté ça depuis Bruno !"
       }
-  auth: inherit
+  auth:
+    type: basic
+    username: jean
+    password: jean123
 
 settings:
   encodeUrl: true

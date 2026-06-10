@@ -194,7 +194,7 @@
     </div>
 
     <script>
-        // --- ÉTAT GLOBAL DE L'APPLICATION ---
+        // Variables globales
         let currentUser = JSON.parse(sessionStorage.getItem('chatUser')) || null;
         let currentChannelId = null;
         let refreshInterval = null;
@@ -213,7 +213,8 @@
         const sendBtn = document.getElementById('sendBtn');
         const notificationArea = document.getElementById('notificationArea');
 
-        // --- INTERFACE D'AUTHENTIFICATION ---
+
+        // Gestion de l'authentification
         function renderAuth() {
             if (currentUser) {
                 authSection.innerHTML = `
@@ -228,24 +229,21 @@
                     <input type="password" id="pwdInput" placeholder="Mot de passe">
                     <button onclick="handleLogin()">Connexion</button>
                 `;
-                // 1. Désactiver les boutons d'envoi
                 messageInput.disabled = true;
                 sendBtn.disabled = true;
                 messageInput.value = '';
 
-                // 2. NETTOYAGE CRUCIAL : On vide l'écran pour les déconnectés
                 currentChannelId = null; 
                 activeChannelName.textContent = 'Sélectionnez un salon pour commencer à discuter';
-                messagesContainer.innerHTML = ''; // Efface les messages secrets du centre
-                channelList.innerHTML = '';       // Efface la liste des salons à gauche
+                messagesContainer.innerHTML = '';
+                channelList.innerHTML = '';
 
-                // 3. Arrêter le rafraîchissement automatique d'arrière-plan
                 clearInterval(refreshInterval);
             }
-            // AJOUT : On recharge les salons pour actualiser l'affichage public/privé
             loadChannels(); 
         }
 
+        // Fonction de connexion
         async function handleLogin() {
             const login = document.getElementById('loginInput').value;
             const pwd = document.getElementById('pwdInput').value;
@@ -260,8 +258,9 @@
 
                 if (response.ok) {
                     currentUser = data.user;
-                    // AJOUT : On sauvegarde l'utilisateur dans la mémoire du navigateur
                     sessionStorage.setItem('chatUser', JSON.stringify(currentUser));
+                    const token = btoa(`${login}:${pwd}`);
+                    sessionStorage.setItem('basicAuthToken', token);
                     
                     notificationArea.textContent = "";
                     renderAuth();
@@ -274,25 +273,30 @@
             }
         }
 
+        // Fonction de déconnexion
         async function handleLogout() {
-            try {
-                await fetch(`${API_BASE}/logout`, { method: 'POST' });
-                currentUser = null;
-                // AJOUT : On vide la mémoire du navigateur
-                sessionStorage.removeItem('chatUser');
-                renderAuth();
-            } catch (err) {
-                console.error("Erreur de déconnexion", err);
-            }
+            currentUser = null;
+            sessionStorage.removeItem('chatUser');
+            sessionStorage.removeItem('basicAuthToken');
+            renderAuth();
         }
 
-        // --- GESTION DES CANAUX ---
+
+        // Gestion des canaux
         async function loadChannels() {
+            const token = sessionStorage.getItem('basicAuthToken');
+            if (!token) return;
+
             try {
-                const response = await fetch(`${API_BASE}/channels`, { 
+                const response = await fetch(`${API_BASE}/channels`, {
                     method: 'GET',
-                    cache: 'no-store' // Interdit formellement la mise en cache
+                    cache: 'no-store',
+                    headers: {
+                        'Authorization': `Basic ${token}`,
+                        'Accept': 'application/json'
+                    }
                 });
+
                 if (response.ok) {
                     const channels = await response.json();
                     channelList.innerHTML = channels.map(ch => `
@@ -302,36 +306,43 @@
                         </li>
                     `).join('');
                 } else {
-                    channelList.innerHTML = `<li style="padding: 15px; color: var(--text-muted)">Connectez-vous pour voir les salons</li>`;
+                    // Modifié pour afficher le vrai code d'erreur (401, 500...)
+                    channelList.innerHTML = `<li style="padding: 15px; color: var(--error)">Erreur ${response.status} : Canaux indisponibles</li>`;
                 }
             } catch (err) {
                 console.error("Impossible de charger les canaux", err);
+                channelList.innerHTML = `<li style="padding: 15px; color: var(--error)">Erreur réseau</li>`;
             }
         }
 
+        // Sélection d'un canal et chargement de ses messages
         function selectChannel(id, name) {
             currentChannelId = id;
             activeChannelName.textContent = `# ${name}`;
             
-            // Gestion visuelle de la sélection active
             document.querySelectorAll('.channel-item').forEach(item => item.classList.remove('active'));
             document.getElementById(`ch-${id}`).classList.add('active');
 
             loadMessages();
 
-            // Phase 5 - Mise à jour périodique : Rafraîchissement automatique toutes les 3 secondes
             clearInterval(refreshInterval);
             refreshInterval = setInterval(loadMessages, 3000);
         }
 
-        // --- GESTION DES MESSAGES ---
+
+        // Gestion des messages
         async function loadMessages() {
             if (!currentChannelId) return;
+            const token = sessionStorage.getItem('basicAuthToken');
 
             try {
                 const response = await fetch(`${API_BASE}/messages?channelId=${currentChannelId}`, {
                     method: 'GET',
-                    cache: 'no-store' // Interdit formellement la mise en cache
+                    cache: 'no-store'
+                    ,headers: {
+                        'Authorization': `Basic ${token}`,
+                        'Accept': 'application/json'
+                    }
                 });
                 if (response.ok) {
                     const messages = await response.json();
@@ -358,12 +369,11 @@
                         `;
                     }).join('');
                     
-                    // Scroll automatique vers le bas lors de la réception de messages
                     messagesContainer.scrollTop = messagesContainer.scrollHeight;
                     notificationArea.textContent = "";
                 } else if (response.status === 401) {
-                    // Si Tomcat dit que la session est morte, on force la déconnexion locale
                     sessionStorage.removeItem('chatUser');
+                    sessionStorage.removeItem('basicAuthToken');
                     currentUser = null;
                     renderAuth();
                     notificationArea.textContent = "Votre session a expiré, veuillez vous reconnecter.";
@@ -386,9 +396,15 @@
             if (!content || !currentChannelId) return;
 
             try {
+                const token = sessionStorage.getItem('basicAuthToken');
+                if (!token) { notificationArea.textContent = 'Authentification requise.'; return; }
+
                 const response = await fetch(`${API_BASE}/messages`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Basic ${token}`
+                    },
                     body: JSON.stringify({
                         channelId: currentChannelId,
                         content: content
@@ -397,7 +413,7 @@
 
                 if (response.ok) {
                     messageInput.value = '';
-                    loadMessages(); // Rechargement immédiat après envoi
+                    loadMessages();
                 } else {
                     const data = await response.json();
                     notificationArea.textContent = data.message || "Erreur d'envoi.";
@@ -413,16 +429,18 @@
             if (!newContent || newContent.trim() === "" || newContent === oldContent) return;
 
             try {
+                const token = sessionStorage.getItem('basicAuthToken');
+                if (!token) { alert('Authentification requise.'); return; }
+
                 const response = await fetch(`${API_BASE}/messages/${id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Basic ${token}` },
                     body: JSON.stringify({ content: newContent })
                 });
 
                 if (response.ok) {
-                    loadMessages(); // Rafraîchir l'écran
+                    loadMessages();
                 } else {
-                    // On récupère le JSON d'erreur précis renvoyé par la servlet doPut
                     const data = await response.json().catch(() => ({ message: "Erreur serveur inconnue" }));
                     alert(`Erreur lors de la modification (${response.status}) : ${data.message}`);
                 }
@@ -437,8 +455,12 @@
             if (!confirm("Voulez-vous vraiment supprimer ce message ?")) return;
 
             try {
+                const token = sessionStorage.getItem('basicAuthToken');
+                if (!token) { alert('Authentification requise.'); return; }
+
                 const response = await fetch(`${API_BASE}/messages/${id}`, {
-                    method: 'DELETE'
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Basic ${token}` }
                 });
 
                 if (response.ok) {
@@ -455,7 +477,6 @@
 
         // Initialisation au chargement de la page
         renderAuth();
-        loadChannels();
     </script>
 </body>
 </html>

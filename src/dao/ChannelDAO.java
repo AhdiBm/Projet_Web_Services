@@ -10,15 +10,18 @@ public interface ChannelDAO {
     // Récupérer tous les canaux existants
     List<Channel> findAll();
     
-    // Récupérer uniquement les canaux publics (Utile pour la Phase 3 - Jalon 1)
+    // Récupérer uniquement les canaux publics
     List<Channel> findPublicChannels();
 
     // Récupérer les canaux auxquels un utilisateur spécifique est abonné
     List<Channel> findAvailableChannels(int userId);
     
-    // Vérifier si un utilisateur est membre d'un canal spécifique (Indispensable pour la Phase 4 - Jalon 2)
+    // Vérifier si un utilisateur est membre d'un canal spécifique
     boolean isUserMember(int channelId, int userId);
     
     // Ajouter un membre dans un canal
     boolean addMember(int channelId, int userId, boolean isRoomAdmin);
+
+    // Créer un nouveau canal
+    boolean create(dto.Channel channel);
 }

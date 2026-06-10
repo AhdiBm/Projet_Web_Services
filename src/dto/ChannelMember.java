@@ -13,12 +13,15 @@ public class ChannelMember {
         this.isRoomAdmin = isRoomAdmin;
     }
 
+    // Getters et setters
     public int getChannelId() { return channelId; }
     public void setChannelId(int channelId) { this.channelId = channelId; }
 
+    // Récupère l'identifiant de l'utilisateur membre du canal.
     public int getUserId() { return userId; }
     public void setUserId(int userId) { this.userId = userId; }
 
+    // Indique si l'utilisateur est un administrateur du canal.
     public boolean isRoomAdmin() { return isRoomAdmin; }
     public void setRoomAdmin(boolean roomAdmin) { isRoomAdmin = roomAdmin; }
 }

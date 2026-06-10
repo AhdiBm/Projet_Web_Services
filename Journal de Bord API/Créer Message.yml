@@ -1,7 +1,7 @@
 info:
   name: Créer Message
   type: http
-  seq: 6
+  seq: 5
 
 http:
   method: POST
@@ -11,9 +11,12 @@ http:
     data: |-
       {
         "channelId": 1,
-        "content": "Exemple de test pour le POST"
+        "content": "Ceci est un test depuis Bruno !"
       }
-  auth: inherit
+  auth:
+    type: basic
+    username: jean
+    password: jean123
 
 settings:
   encodeUrl: true
