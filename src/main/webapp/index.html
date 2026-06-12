@@ -180,7 +180,11 @@
         </aside>
 
         <main class="chat-area">
-            <div id="activeChannelName" class="chat-header">Sélectionnez un salon pour commencer à discuter</div>
+            <div class="chat-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <div id="activeChannelName">Sélectionnez un salon pour commencer à discuter</div>
+                <div id="channelActions"></div>
+            </div>
+
             <div id="messagesContainer" class="messages-container"></div>
             
             <div class="input-area">
@@ -327,8 +331,49 @@
 
             clearInterval(refreshInterval);
             refreshInterval = setInterval(loadMessages, 3000);
+            const channelActions = document.getElementById('channelActions');
+            const clickedElement = document.getElementById(`ch-${id}`);
+            const isPrivate = clickedElement ? clickedElement.querySelector('.channel-type').textContent === 'private' : false;
+
+            if (isPrivate) {
+                channelActions.innerHTML = `<button onclick="inviteUserToChannel(${id})" style="background-color: var(--success); color: #181825; padding: 4px 10px; font-size: 0.85rem;">➕ Inviter</button>`;
+            } else {
+                channelActions.innerHTML = '';
+            }
         }
 
+        // Fonction pour inviter un utilisateur à un canal privé
+        async function inviteUserToChannel(channelId) {
+            const loginToInvite = prompt("Saisissez l'identifiant (login) de la personne à inviter :");
+            if (!loginToInvite || loginToInvite.trim() === "") return;
+
+            const token = sessionStorage.getItem('basicAuthToken');
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/channels/members`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Basic ${token}`
+                    },
+                    body: JSON.stringify({
+                        channelId: channelId,
+                        login: loginToInvite.trim()
+                    })
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    alert(`Succès : ${data.message}`);
+                } else {
+                    alert(`Erreur (${response.status}) : ${data.message}`);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Erreur lors de l'envoi de l'invitation.");
+            }
+        }
 
         // Gestion des messages
         async function loadMessages() {

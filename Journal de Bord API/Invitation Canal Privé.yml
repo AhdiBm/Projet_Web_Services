@@ -1,17 +1,17 @@
 info:
-  name: Créer Message
+  name: Invitation Canal Privé
   type: http
-  seq: 6
+  seq: 4
 
 http:
   method: POST
-  url: http://localhost:8080/JournalAPI/api/messages
+  url: http://localhost:8080/JournalAPI/api/channels/members
   body:
     type: json
     data: |-
       {
-        "channelId": 1,
-        "content": "Ceci est un test depuis Bruno !"
+        "channelId": 2,
+        "login": "jean"
       }
   auth:
     type: basic

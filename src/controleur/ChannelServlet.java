@@ -18,7 +18,7 @@ import java.io.BufferedReader;
 import java.util.List;
 import dto.User;
 
-@WebServlet("/api/channels")
+@WebServlet("/api/channels/*")
 public class ChannelServlet extends HttpServlet {
     
     private ChannelDAO channelDAO;
@@ -72,32 +72,80 @@ public class ChannelServlet extends HttpServlet {
         User currentUser = getAuthenticatedUser(request);
         if (currentUser == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Accès refusé : Authentification Basic REST requise.\"}");
+            out.print("{\"status\":\"error\",\"code\":401,\"message\":\"Accès refusé : Authentification REST requise.\"}");
+            return;
+        }
+
+        String pathInfo = request.getPathInfo();
+
+        if (pathInfo != null && pathInfo.equals("/members")) {
+            try {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                try (BufferedReader reader = request.getReader()) {
+                    while ((line = reader.readLine()) != null) { sb.append(line); }
+                }
+
+                // Lecture des paramètres d'invitation
+                com.fasterxml.jackson.databind.JsonNode jsonNode = objectMapper.readTree(sb.toString());
+                int channelId = jsonNode.get("channelId").asInt();
+                String userToInviteLogin = jsonNode.get("login").asText();
+
+                // Trouver l'ID de l'utilisateur à inviter via son login
+                dao.UserDAO userDAO = new dao.UserDAOJDBC();
+                User userToInvite = userDAO.findByLogin(userToInviteLogin);
+                if (userToInvite == null) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    out.print("{\"status\":\"error\",\"code\":404,\"message\":\"Utilisateur introuvable.\"}");
+                    return;
+                }
+
+                // Vérifier si le canal existe et si l'utilisateur courant en est bien le créateur/admin
+                Channel channel = channelDAO.findById(channelId);
+                if (channel == null) {
+                    response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    out.print("{\"status\":\"error\",\"code\":404,\"message\":\"Canal introuvable.\"}");
+                    return;
+                }
+
+                if (channel.getCreatorId() != currentUser.getId() && !"admin".equalsIgnoreCase(currentUser.getRole())) {
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    out.print("{\"status\":\"error\",\"code\":403,\"message\":\"Accès refusé : Seul le créateur du salon peut inviter des membres.\"}");
+                    return;
+                }
+
+                // Ajouter le membre via le DAO
+                if (channelDAO.addMember(channelId, userToInvite.getId(), false)) {
+                    response.setStatus(HttpServletResponse.SC_CREATED); // 201
+                    out.print("{\"status\":\"success\",\"message\":\"" + userToInviteLogin + " a été ajouté avec succès au canal.\"}");
+                } else {
+                    response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    out.print("{\"status\":\"error\",\"code\":500,\"message\":\"Cet utilisateur est déjà membre ou une erreur SQL est survenue.\"}");
+                }
+            } catch (Exception e) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"status\":\"error\",\"code\":400,\"message\":\"Données JSON invalides.\"}");
+            }
+            out.flush();
             return;
         }
 
         try {
-            // Lire le corps JSON de la requête
             StringBuilder sb = new StringBuilder();
             String line;
             try (BufferedReader reader = request.getReader()) {
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
+                while ((line = reader.readLine()) != null) { sb.append(line); }
             }
 
             dto.Channel newChannel = objectMapper.readValue(sb.toString(), dto.Channel.class);
-            
             newChannel.setCreatorId(currentUser.getId());
 
-            // Valider les champs obligatoires
             if (newChannel.getName() == null || newChannel.getName().trim().isEmpty() || newChannel.getType() == null) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.print("{\"status\":\"error\",\"code\":400,\"message\":\"Champs requis manquants (name, type).\"}");
                 return;
             }
 
-            dao.ChannelDAO channelDAO = new dao.ChannelDAOJDBC();
             if (channelDAO.create(newChannel)) {
                 response.setStatus(HttpServletResponse.SC_CREATED);
                 out.print(objectMapper.writeValueAsString(newChannel));
@@ -105,7 +153,6 @@ public class ChannelServlet extends HttpServlet {
                 response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
                 out.print("{\"status\":\"error\",\"code\":500,\"message\":\"Impossible de sauvegarder le canal en base de données.\"}");
             }
-
         } catch (Exception e) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             out.print("{\"status\":\"error\",\"code\":400,\"message\":\"Format JSON invalide.\"}");
